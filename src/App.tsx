@@ -4,6 +4,7 @@ import { RSSReader } from './components/RSSReader/RSSReader';
 import { URLFetcher } from './components/URLFetcher/URLFetcher';
 import { NotesEditor } from './components/NotesEditor/NotesEditor';
 import { KnowledgeStore } from './components/KnowledgeStore/KnowledgeStore';
+import { AISummarizer } from './components/AISummarizer/AISummarizer';
 import { useAppStore } from './store/appStore';
 
 function App() {
@@ -19,6 +20,8 @@ function App() {
         return <NotesEditor />;
       case 'store':
         return <KnowledgeStore />;
+      case 'summarize':
+        return <AISummarizer />;
       default:
         return <RSSReader />;
     }

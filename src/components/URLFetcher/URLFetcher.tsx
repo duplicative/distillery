@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Download, Link, FileText, Edit, Loader } from 'lucide-react';
+import { Download, Link, FileText, Edit, Loader, Sparkles } from 'lucide-react';
 import { urlToMarkdownService } from '../../services/urlToMarkdown';
 import { dbService } from '../../services/database';
+import { useAppStore } from '../../store/appStore';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Card, CardContent, CardHeader } from '../ui/Card';
@@ -17,6 +18,7 @@ interface ConvertedContent {
 }
 
 export const URLFetcher: React.FC = () => {
+  const { setArticleToSummarize, setActiveTab } = useAppStore();
   const [url, setUrl] = useState('');
   const [urls, setUrls] = useState<string[]>([]);
   const [isConverting, setIsConverting] = useState(false);
@@ -88,6 +90,31 @@ export const URLFetcher: React.FC = () => {
   const handleSendToEditor = () => {
     // TODO: Implement send to editor functionality
     console.log('Send to editor:', convertedContent);
+  };
+
+  const handleSendToAI = () => {
+    if (!convertedContent) return;
+    
+    // Create a temporary article object for AI summarization
+    const tempArticle = {
+      id: 'temp-' + Date.now(),
+      feedId: 'manual',
+      title: convertedContent.title,
+      content: convertedContent.content,
+      summary: convertedContent.summary,
+      url: convertedContent.originalUrl,
+      author: convertedContent.author,
+      publishDate: convertedContent.publishDate 
+        ? new Date(convertedContent.publishDate).getTime() 
+        : Date.now(),
+      isRead: false,
+      isFavorite: false,
+      tags: ['web-clipping'],
+      createdAt: Date.now(),
+    };
+    
+    setArticleToSummarize(tempArticle);
+    setActiveTab('summarize');
   };
 
   return (
@@ -215,6 +242,15 @@ export const URLFetcher: React.FC = () => {
               <div className="flex items-center space-x-3">
                 <Button
                   variant="primary"
+                  size="sm"
+                  icon={Sparkles}
+                  onClick={handleSendToAI}
+                >
+                  Summarize with AI
+                </Button>
+                
+                <Button
+                  variant="secondary"
                   size="sm"
                   icon={Edit}
                   onClick={handleSendToEditor}

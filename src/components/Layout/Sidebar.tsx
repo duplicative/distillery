@@ -1,5 +1,5 @@
 import React from 'react';
-import { Rss, Download, Edit, Archive, Plus, Search } from 'lucide-react';
+import { Rss, Download, Edit, Archive, Plus, Search, Sparkles } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { TabType } from '../../types';
 import { Button } from '../ui/Button';
@@ -16,6 +16,7 @@ const sidebarItems: SidebarItem[] = [
   { id: 'fetch', label: 'Fetch URL', icon: Download },
   { id: 'editor', label: 'Notes Editor', icon: Edit },
   { id: 'store', label: 'Knowledge Store', icon: Archive },
+  { id: 'summarize', label: 'AI Summarizer', icon: Sparkles },
 ];
 
 export const Sidebar: React.FC = () => {

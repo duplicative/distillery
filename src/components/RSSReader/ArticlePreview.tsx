@@ -1,8 +1,9 @@
 import React from 'react';
-import { ExternalLink, Star, Edit, Share, Calendar, User } from 'lucide-react';
+import { ExternalLink, Star, Edit, Share, Calendar, User, Sparkles } from 'lucide-react';
 import { Article } from '../../types';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '../ui/Button';
+import { useAppStore } from '../../store/appStore';
 import ReactMarkdown from 'react-markdown';
 
 interface ArticlePreviewProps {
@@ -10,6 +11,8 @@ interface ArticlePreviewProps {
 }
 
 export const ArticlePreview: React.FC<ArticlePreviewProps> = ({ article }) => {
+  const { setArticleToSummarize, setActiveTab } = useAppStore();
+
   if (!article) {
     return (
       <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
@@ -25,6 +28,11 @@ export const ArticlePreview: React.FC<ArticlePreviewProps> = ({ article }) => {
   const handleSendToEditor = () => {
     // TODO: Implement send to editor functionality
     console.log('Send to editor:', article.id);
+  };
+
+  const handleSendToAI = () => {
+    setArticleToSummarize(article);
+    setActiveTab('summarize');
   };
 
   const handleShare = () => {
@@ -81,6 +89,15 @@ export const ArticlePreview: React.FC<ArticlePreviewProps> = ({ article }) => {
         <div className="flex items-center space-x-3">
           <Button
             variant="primary"
+            size="sm"
+            icon={Sparkles}
+            onClick={handleSendToAI}
+          >
+            Summarize with AI
+          </Button>
+          
+          <Button
+            variant="secondary"
             size="sm"
             icon={Edit}
             onClick={handleSendToEditor}

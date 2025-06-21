@@ -1,8 +1,9 @@
 import React from 'react';
-import { X, Star, ExternalLink, Edit, Share, Calendar, User, Tag } from 'lucide-react';
+import { X, Star, ExternalLink, Edit, Share, Calendar, User, Tag, Sparkles } from 'lucide-react';
 import { Article } from '../../types';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '../ui/Button';
+import { useAppStore } from '../../store/appStore';
 import ReactMarkdown from 'react-markdown';
 
 interface ArticleDetailProps {
@@ -16,9 +17,16 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
   onClose,
   onToggleFavorite,
 }) => {
+  const { setArticleToSummarize, setActiveTab } = useAppStore();
+
   const handleSendToEditor = () => {
     // TODO: Implement send to editor functionality
     console.log('Send to editor:', article.id);
+  };
+
+  const handleSendToAI = () => {
+    setArticleToSummarize(article);
+    setActiveTab('summarize');
   };
 
   const handleShare = () => {
@@ -118,6 +126,15 @@ export const ArticleDetail: React.FC<ArticleDetailProps> = ({
         <div className="flex items-center space-x-3">
           <Button
             variant="primary"
+            size="sm"
+            icon={Sparkles}
+            onClick={handleSendToAI}
+          >
+            Summarize with AI
+          </Button>
+          
+          <Button
+            variant="secondary"
             size="sm"
             icon={Edit}
             onClick={handleSendToEditor}
