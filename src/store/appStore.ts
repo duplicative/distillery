@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { TabType, AppSettings } from '../types';
+import { TabType, AppSettings, Article } from '../types';
 import { dbService } from '../services/database';
 
 interface AppState {
@@ -10,6 +10,9 @@ interface AppState {
   
   // Settings
   settings: AppSettings;
+  
+  // AI Summarizer State
+  articleToSummarize: Article | null;
   
   // Loading states
   isLoading: boolean;
@@ -22,6 +25,7 @@ interface AppState {
   updateSettings: (settings: Partial<AppSettings>) => Promise<void>;
   loadSettings: () => Promise<void>;
   setLoading: (loading: boolean) => void;
+  setArticleToSummarize: (article: Article | null) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -30,6 +34,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   theme: 'system',
   sidebarCollapsed: false,
   isLoading: false,
+  articleToSummarize: null,
   settings: {
     theme: 'system',
     updateInterval: 30,
@@ -88,6 +93,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   
   setLoading: (loading) => set({ isLoading: loading }),
+  
+  setArticleToSummarize: (article) => set({ articleToSummarize: article }),
 }));
 
 // Initialize app on load

@@ -62,11 +62,20 @@ export interface FeedCategory {
   feedIds: string[];
 }
 
-export type TabType = 'rss' | 'fetch' | 'editor' | 'store';
+export type TabType = 'rss' | 'fetch' | 'editor' | 'store' | 'summarize';
 
 export interface SearchResult {
   type: 'article' | 'note';
   item: Article | Note;
   score: number;
   highlights: string[];
+}
+
+export interface SummaryResult {
+  id: string;
+  originalArticleId: string;
+  summary: string;
+  model: string;
+  prompt: string;
+  createdAt: number;
 }
