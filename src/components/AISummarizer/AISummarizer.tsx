@@ -29,7 +29,7 @@ export const AISummarizer: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(true); // Default to true to show settings
 
   const providers = aiSummarizerService.getProviders();
   const availableModels = aiSummarizerService.getModelsByProvider(provider);
