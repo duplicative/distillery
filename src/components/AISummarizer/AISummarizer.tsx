@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Sparkles, Save, Settings, AlertCircle, CheckCircle, Copy, ExternalLink } from 'lucide-react';
+import { Bot, Sparkles, Save, Settings, AlertCircle, CheckCircle, Copy, ExternalLink, Plus, Trash2, Edit3 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
-import { aiSummarizerService } from '../../services/aiSummarizer';
+import { aiSummarizerService, SavedPrompt } from '../../services/aiSummarizer';
 import { dbService } from '../../services/database';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -10,29 +10,75 @@ import ReactMarkdown from 'react-markdown';
 
 export const AISummarizer: React.FC = () => {
   const { articleToSummarize, setActiveTab } = useAppStore();
+  
+  // Configuration state
+  const [provider, setProvider] = useState<'openrouter' | 'gemini'>('openrouter');
   const [apiKey, setApiKey] = useState('');
-  const [selectedModel, setSelectedModel] = useState('anthropic/claude-3-haiku');
-  const [customPrompt, setCustomPrompt] = useState('');
+  const [selectedModel, setSelectedModel] = useState('');
+  const [selectedPromptId, setSelectedPromptId] = useState('default');
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
+  
+  // Prompt management state
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState<SavedPrompt | null>(null);
+  const [newPromptName, setNewPromptName] = useState('');
+  const [newPromptContent, setNewPromptContent] = useState('');
+  
+  // Summarization state
   const [summary, setSummary] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
-  const availableModels = aiSummarizerService.getAvailableModels();
+  const providers = aiSummarizerService.getProviders();
+  const availableModels = aiSummarizerService.getModelsByProvider(provider);
 
   useEffect(() => {
-    // Load saved API key from localStorage
-    const savedApiKey = localStorage.getItem('openrouter_api_key');
+    loadSavedPrompts();
+    loadSavedSettings();
+  }, []);
+
+  useEffect(() => {
+    // Update available models when provider changes
+    const models = aiSummarizerService.getModelsByProvider(provider);
+    if (models.length > 0 && !models.find(m => m.id === selectedModel)) {
+      setSelectedModel(models[0].id);
+    }
+  }, [provider, selectedModel]);
+
+  const loadSavedSettings = () => {
+    // Load saved settings
+    const savedProvider = localStorage.getItem('ai_summarizer_provider') as 'openrouter' | 'gemini';
+    if (savedProvider) {
+      setProvider(savedProvider);
+    }
+
+    const savedApiKey = localStorage.getItem(`ai_summarizer_api_key_${provider}`);
     if (savedApiKey) {
       setApiKey(savedApiKey);
     }
 
-    const savedModel = localStorage.getItem('ai_summarizer_model');
+    const savedModel = localStorage.getItem(`ai_summarizer_model_${provider}`);
     if (savedModel) {
       setSelectedModel(savedModel);
+    } else {
+      const models = aiSummarizerService.getModelsByProvider(provider);
+      if (models.length > 0) {
+        setSelectedModel(models[0].id);
+      }
     }
-  }, []);
+
+    const savedPromptId = localStorage.getItem('ai_summarizer_prompt_id');
+    if (savedPromptId) {
+      setSelectedPromptId(savedPromptId);
+    }
+  };
+
+  const loadSavedPrompts = () => {
+    const prompts = aiSummarizerService.getSavedPrompts();
+    setSavedPrompts(prompts);
+  };
 
   const handleSummarize = async () => {
     if (!articleToSummarize) {
@@ -41,12 +87,19 @@ export const AISummarizer: React.FC = () => {
     }
 
     if (!apiKey) {
-      setError('Please enter your OpenRouter API key');
+      setError(`Please enter your ${provider === 'gemini' ? 'Google API' : 'OpenRouter API'} key`);
       return;
     }
 
-    if (!aiSummarizerService.validateApiKey(apiKey)) {
-      setError('Invalid API key format. OpenRouter API keys should start with "sk-"');
+    if (!aiSummarizerService.validateApiKey(apiKey, provider)) {
+      const expectedPrefix = providers.find(p => p.id === provider)?.apiKeyPrefix || '';
+      setError(`Invalid API key format. ${provider === 'gemini' ? 'Google API' : 'OpenRouter API'} keys should start with "${expectedPrefix}"`);
+      return;
+    }
+
+    const selectedPrompt = savedPrompts.find(p => p.id === selectedPromptId);
+    if (!selectedPrompt) {
+      setError('Please select a prompt');
       return;
     }
 
@@ -55,23 +108,74 @@ export const AISummarizer: React.FC = () => {
     setSuccess(null);
 
     try {
-      // Save API key and model to localStorage
-      localStorage.setItem('openrouter_api_key', apiKey);
-      localStorage.setItem('ai_summarizer_model', selectedModel);
+      // Save settings to localStorage
+      localStorage.setItem('ai_summarizer_provider', provider);
+      localStorage.setItem(`ai_summarizer_api_key_${provider}`, apiKey);
+      localStorage.setItem(`ai_summarizer_model_${provider}`, selectedModel);
+      localStorage.setItem('ai_summarizer_prompt_id', selectedPromptId);
 
       const result = await aiSummarizerService.summarizeText({
         content: articleToSummarize.content,
-        prompt: customPrompt || undefined,
+        prompt: selectedPrompt.content,
         model: selectedModel,
+        provider: provider,
         apiKey: apiKey
       });
 
       setSummary(result.summary);
-      setSuccess(`Summary generated successfully using ${result.model}${result.tokensUsed ? ` (${result.tokensUsed} tokens)` : ''}`);
+      setSuccess(`Summary generated successfully using ${result.model} via ${result.provider}${result.tokensUsed ? ` (${result.tokensUsed} tokens)` : ''}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate summary');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSavePrompt = () => {
+    if (!newPromptName.trim() || !newPromptContent.trim()) {
+      setError('Please enter both prompt name and content');
+      return;
+    }
+
+    try {
+      if (editingPrompt) {
+        aiSummarizerService.updatePrompt(editingPrompt.id, {
+          name: newPromptName,
+          content: newPromptContent
+        });
+      } else {
+        aiSummarizerService.savePrompt({
+          name: newPromptName,
+          content: newPromptContent
+        });
+      }
+      
+      loadSavedPrompts();
+      setShowPromptEditor(false);
+      setEditingPrompt(null);
+      setNewPromptName('');
+      setNewPromptContent('');
+      setSuccess(editingPrompt ? 'Prompt updated successfully' : 'Prompt saved successfully');
+    } catch (err) {
+      setError('Failed to save prompt');
+    }
+  };
+
+  const handleEditPrompt = (prompt: SavedPrompt) => {
+    setEditingPrompt(prompt);
+    setNewPromptName(prompt.name);
+    setNewPromptContent(prompt.content);
+    setShowPromptEditor(true);
+  };
+
+  const handleDeletePrompt = (promptId: string) => {
+    if (window.confirm('Are you sure you want to delete this prompt?')) {
+      aiSummarizerService.deletePrompt(promptId);
+      loadSavedPrompts();
+      if (selectedPromptId === promptId) {
+        setSelectedPromptId('default');
+      }
+      setSuccess('Prompt deleted successfully');
     }
   };
 
@@ -85,7 +189,7 @@ export const AISummarizer: React.FC = () => {
         content: summary,
         summary: `AI-generated summary of "${articleToSummarize.title}"`,
         url: articleToSummarize.url,
-        author: `AI (${selectedModel})`,
+        author: `AI (${selectedModel} via ${provider})`,
         publishDate: Date.now(),
         isRead: false,
         isFavorite: false,
@@ -203,10 +307,31 @@ export const AISummarizer: React.FC = () => {
                 <h3 className="font-medium text-gray-900 dark:text-white">Configuration</h3>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Provider Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    AI Provider
+                  </label>
+                  <select
+                    value={provider}
+                    onChange={(e) => setProvider(e.target.value as 'openrouter' | 'gemini')}
+                    className="input-field"
+                  >
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Choose your preferred AI service provider
+                  </p>
+                </div>
+
                 <Input
-                  label="OpenRouter API Key"
+                  label={`${provider === 'gemini' ? 'Google API' : 'OpenRouter API'} Key`}
                   type="password"
-                  placeholder="sk-or-..."
+                  placeholder={providers.find(p => p.id === provider)?.apiKeyPrefix + '...'}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                 />
@@ -222,23 +347,132 @@ export const AISummarizer: React.FC = () => {
                   >
                     {availableModels.map((model) => (
                       <option key={model.id} value={model.id}>
-                        {model.name} ({model.provider})
+                        {model.name} - {model.description}
                       </option>
                     ))}
                   </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Select the AI model for summarization
+                  </p>
                 </div>
+                
+                {/* Prompt Management */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Summarization Prompt
+                    </label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={Plus}
+                      onClick={() => {
+                        setEditingPrompt(null);
+                        setNewPromptName('');
+                        setNewPromptContent('');
+                        setShowPromptEditor(true);
+                      }}
+                    >
+                      New
+                    </Button>
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    <select
+                      value={selectedPromptId}
+                      onChange={(e) => setSelectedPromptId(e.target.value)}
+                      className="input-field flex-1"
+                    >
+                      {savedPrompts.map((prompt) => (
+                        <option key={prompt.id} value={prompt.id}>
+                          {prompt.name} {prompt.isDefault ? '(Default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    
+                    {selectedPromptId !== 'default' && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Edit3}
+                          onClick={() => {
+                            const prompt = savedPrompts.find(p => p.id === selectedPromptId);
+                            if (prompt) handleEditPrompt(prompt);
+                          }}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Trash2}
+                          onClick={() => handleDeletePrompt(selectedPromptId)}
+                          className="text-error-600 hover:text-error-700"
+                        />
+                      </>
+                    )}
+                  </div>
+                  
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Choose or create custom prompts for different summarization styles
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Prompt Editor Modal */}
+          {showPromptEditor && (
+            <Card className="mb-4 border-primary-200 dark:border-primary-800">
+              <CardHeader>
+                <h3 className="font-medium text-gray-900 dark:text-white">
+                  {editingPrompt ? 'Edit Prompt' : 'Create New Prompt'}
+                </h3>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Input
+                  label="Prompt Name"
+                  placeholder="e.g., Technical Summary, Key Points, etc."
+                  value={newPromptName}
+                  onChange={(e) => setNewPromptName(e.target.value)}
+                />
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Custom Prompt (Optional)
+                    Prompt Content
                   </label>
                   <textarea
-                    placeholder="Enter custom summarization instructions..."
-                    value={customPrompt}
-                    onChange={(e) => setCustomPrompt(e.target.value)}
-                    rows={3}
+                    placeholder="Enter your custom summarization instructions..."
+                    value={newPromptContent}
+                    onChange={(e) => setNewPromptContent(e.target.value)}
+                    rows={4}
                     className="input-field resize-none"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    End your prompt with "Article content:" for best results
+                  </p>
+                </div>
+                
+                <div className="flex space-x-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSavePrompt}
+                    disabled={!newPromptName.trim() || !newPromptContent.trim()}
+                  >
+                    {editingPrompt ? 'Update' : 'Save'} Prompt
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setShowPromptEditor(false);
+                      setEditingPrompt(null);
+                      setNewPromptName('');
+                      setNewPromptContent('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -301,7 +535,7 @@ export const AISummarizer: React.FC = () => {
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-gray-900 dark:text-white">Generated Summary</h3>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Model: {availableModels.find(m => m.id === selectedModel)?.name}
+                  {provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'} • {availableModels.find(m => m.id === selectedModel)?.name}
                 </span>
               </div>
               
@@ -320,7 +554,7 @@ export const AISummarizer: React.FC = () => {
                 <p className="text-lg font-medium mb-2">Ready to Summarize</p>
                 <p className="text-sm">
                   {!apiKey 
-                    ? 'Enter your OpenRouter API key and click "Summarize with AI"'
+                    ? `Enter your ${provider === 'gemini' ? 'Google API' : 'OpenRouter API'} key and click "Summarize with AI"`
                     : 'Click "Summarize with AI" to generate an intelligent summary'
                   }
                 </p>
