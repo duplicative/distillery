@@ -11,6 +11,9 @@ import ReactMarkdown from 'react-markdown';
 export const AISummarizer: React.FC = () => {
   const { articleToSummarize, setActiveTab } = useAppStore();
   
+  // Child tab state
+  const [activeChildTab, setActiveChildTab] = useState<'summarize' | 'config'>('summarize');
+  
   // Configuration state
   const [provider, setProvider] = useState<'openrouter' | 'gemini'>('openrouter');
   const [apiKey, setApiKey] = useState('');
@@ -29,7 +32,6 @@ export const AISummarizer: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(true); // Default to true to show settings
 
   const providers = aiSummarizerService.getProviders();
   const availableModels = aiSummarizerService.getModelsByProvider(provider);
@@ -276,7 +278,7 @@ export const AISummarizer: React.FC = () => {
       {/* Right Panel - AI Summarizer */}
       <div className="w-1/2 flex flex-col">
         {/* Header */}
-        <div className="border-b border-gray-200 dark:border-gray-800 p-6">
+        <div className="border-b border-gray-200 dark:border-gray-800 p-6 pb-0">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-primary-100 dark:bg-primary-900 rounded-lg">
@@ -291,18 +293,44 @@ export const AISummarizer: React.FC = () => {
                 </p>
               </div>
             </div>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={Settings}
-              onClick={() => setShowSettings(!showSettings)}
-            />
           </div>
 
-          {/* Settings Panel */}
-          {showSettings && (
-            <Card className="mb-4">
+          {/* Child Tabs */}
+          <div className="flex space-x-1 mb-6">
+            <button
+              onClick={() => setActiveChildTab('summarize')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                activeChildTab === 'summarize'
+                  ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Sparkles size={16} />
+                <span>Summarize</span>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => setActiveChildTab('config')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                activeChildTab === 'config'
+                  ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Settings size={16} />
+                <span>Configuration</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Child Tab Content */}
+        {activeChildTab === 'config' && (
+          <div className="flex-1 overflow-y-auto p-6">
+            <Card>
               <CardHeader>
                 <h3 className="font-medium text-gray-900 dark:text-white">Configuration</h3>
               </CardHeader>
@@ -418,150 +446,173 @@ export const AISummarizer: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-          )}
 
-          {/* Prompt Editor Modal */}
-          {showPromptEditor && (
-            <Card className="mb-4 border-primary-200 dark:border-primary-800">
-              <CardHeader>
-                <h3 className="font-medium text-gray-900 dark:text-white">
-                  {editingPrompt ? 'Edit Prompt' : 'Create New Prompt'}
-                </h3>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Input
-                  label="Prompt Name"
-                  placeholder="e.g., Technical Summary, Key Points, etc."
-                  value={newPromptName}
-                  onChange={(e) => setNewPromptName(e.target.value)}
-                />
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Prompt Content
-                  </label>
-                  <textarea
-                    placeholder="Enter your custom summarization instructions..."
-                    value={newPromptContent}
-                    onChange={(e) => setNewPromptContent(e.target.value)}
-                    rows={4}
-                    className="input-field resize-none"
+            {/* Prompt Editor Modal */}
+            {showPromptEditor && (
+              <Card className="mt-4 border-primary-200 dark:border-primary-800">
+                <CardHeader>
+                  <h3 className="font-medium text-gray-900 dark:text-white">
+                    {editingPrompt ? 'Edit Prompt' : 'Create New Prompt'}
+                  </h3>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Input
+                    label="Prompt Name"
+                    placeholder="e.g., Technical Summary, Key Points, etc."
+                    value={newPromptName}
+                    onChange={(e) => setNewPromptName(e.target.value)}
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    End your prompt with "Article content:" for best results
-                  </p>
-                </div>
-                
-                <div className="flex space-x-2">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleSavePrompt}
-                    disabled={!newPromptName.trim() || !newPromptContent.trim()}
-                  >
-                    {editingPrompt ? 'Update' : 'Save'} Prompt
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setShowPromptEditor(false);
-                      setEditingPrompt(null);
-                      setNewPromptName('');
-                      setNewPromptContent('');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="primary"
-              onClick={handleSummarize}
-              loading={isLoading}
-              disabled={!apiKey}
-              icon={Sparkles}
-            >
-              {isLoading ? 'Generating Summary...' : 'Summarize with AI'}
-            </Button>
-            
-            {summary && (
-              <>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={Copy}
-                  onClick={handleCopySummary}
-                >
-                  Copy
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={Save}
-                  onClick={handleSaveToKnowledge}
-                >
-                  Save to Knowledge Store
-                </Button>
-              </>
-            )}
-          </div>
-
-          {/* Status Messages */}
-          {error && (
-            <div className="mt-4 p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-lg flex items-center space-x-2">
-              <AlertCircle size={16} className="text-error-600 dark:text-error-400" />
-              <p className="text-sm text-error-700 dark:text-error-300">{error}</p>
-            </div>
-          )}
-
-          {success && (
-            <div className="mt-4 p-3 bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800 rounded-lg flex items-center space-x-2">
-              <CheckCircle size={16} className="text-success-600 dark:text-success-400" />
-              <p className="text-sm text-success-700 dark:text-success-300">{success}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Summary Display */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {summary ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium text-gray-900 dark:text-white">Generated Summary</h3>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'} • {availableModels.find(m => m.id === selectedModel)?.name}
-                </span>
-              </div>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="prose prose-gray dark:prose-invert max-w-none">
-                    <ReactMarkdown>{summary}</ReactMarkdown>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Prompt Content
+                    </label>
+                    <textarea
+                      placeholder="Enter your custom summarization instructions..."
+                      value={newPromptContent}
+                      onChange={(e) => setNewPromptContent(e.target.value)}
+                      rows={4}
+                      className="input-field resize-none"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      End your prompt with "Article content:" for best results
+                    </p>
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleSavePrompt}
+                      disabled={!newPromptName.trim() || !newPromptContent.trim()}
+                    >
+                      {editingPrompt ? 'Update' : 'Save'} Prompt
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setShowPromptEditor(false);
+                        setEditingPrompt(null);
+                        setNewPromptName('');
+                        setNewPromptContent('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
-              <div className="text-center">
-                <Bot size={48} className="mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium mb-2">Ready to Summarize</p>
-                <p className="text-sm">
-                  {!apiKey 
-                    ? `Enter your ${provider === 'gemini' ? 'Google API' : 'OpenRouter API'} key and click "Summarize with AI"`
-                    : 'Click "Summarize with AI" to generate an intelligent summary'
-                  }
+            )}
+          </div>
+        )}
+
+        {/* Summarize Tab Content */}
+        {activeChildTab === 'summarize' && (
+          <div className="flex-1 flex flex-col">
+            <div className="border-b border-gray-200 dark:border-gray-800 p-6">
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-3 mb-4">
+                <Button
+                  variant="primary"
+                  onClick={handleSummarize}
+                  loading={isLoading}
+                  disabled={!apiKey}
+                  icon={Sparkles}
+                >
+                  {isLoading ? 'Generating Summary...' : 'Summarize with AI'}
+                </Button>
+                
+                {summary && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Copy}
+                      onClick={handleCopySummary}
+                    >
+                      Copy
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Save}
+                      onClick={handleSaveToKnowledge}
+                    >
+                      Save to Knowledge Store
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {/* Status Messages */}
+              {error && (
+                <div className="p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-lg flex items-center space-x-2 mb-4">
+                  <AlertCircle size={16} className="text-error-600 dark:text-error-400" />
+                  <p className="text-sm text-error-700 dark:text-error-300">{error}</p>
+                </div>
+              )}
+
+              {success && (
+                <div className="p-3 bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800 rounded-lg flex items-center space-x-2 mb-4">
+                  <CheckCircle size={16} className="text-success-600 dark:text-success-400" />
+                  <p className="text-sm text-success-700 dark:text-success-300">{success}</p>
+                </div>
+              )}
+              
+              {/* Quick Settings Summary */}
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                <p>
+                  <strong>Provider:</strong> {provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'} • 
+                  <strong> Model:</strong> {availableModels.find(m => m.id === selectedModel)?.name || 'Not selected'} • 
+                  <strong> Prompt:</strong> {savedPrompts.find(p => p.id === selectedPromptId)?.name || 'Default'}
+                </p>
+                <p className="mt-1">
+                  {!apiKey && (
+                    <span className="text-warning-600 dark:text-warning-400">
+                      ⚠️ API key required - configure in the Configuration tab
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
-          )}
-        </div>
+
+            {/* Summary Display */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {summary ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-gray-900 dark:text-white">Generated Summary</h3>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'} • {availableModels.find(m => m.id === selectedModel)?.name}
+                    </span>
+                  </div>
+                  
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="prose prose-gray dark:prose-invert max-w-none">
+                        <ReactMarkdown>{summary}</ReactMarkdown>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                  <div className="text-center">
+                    <Bot size={48} className="mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium mb-2">Ready to Summarize</p>
+                    <p className="text-sm">
+                      {!apiKey 
+                        ? 'Configure your API settings in the Configuration tab, then click "Summarize with AI"'
+                        : 'Click "Summarize with AI" to generate an intelligent summary'
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
